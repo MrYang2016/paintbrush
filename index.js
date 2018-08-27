@@ -5,15 +5,18 @@ class Paintbrush {
     this.canvasDiv = typeof canvasDiv === 'string' ? document.querySelector(canvasDiv) : canvasDiv;
     this.canvasDiv.setAttribute('style', 'position:relative;');
 
-    this.canvas = this.getNewCanvas();
-    this.ctx = this.canvas.getContext('2d');
+    const canvasObj = this.getNewCanvas();
+    this.canvas = canvasObj.newCanvas;
+    this.ctx = canvasObj.ctx;
 
-    this.temCanvas = this.getNewCanvas();
-    this.temCtx = this.temCanvas.getContext('2d');
+    const temCanvasObj = this.getNewCanvas();
+    this.temCanvas = temCanvasObj.newCanvas;
+    this.temCtx = temCanvasObj.ctx;
 
-    this.notLineCanvas = this.getNewCanvas();
-    this.notLineCtx = this.notLineCanvas.getContext('2d');
-    
+    const notLineCanvasObj = this.getNewCanvas();
+    this.notLineCanvas = notLineCanvasObj.newCanvas;
+    this.notLineCtx = notLineCanvasObj.ctx;
+
     this.isDown = false;
     this.endCoor = {};
     this.startCoor = {};
@@ -68,9 +71,9 @@ class Paintbrush {
   }
 
   done() {
-    if (this.isDown && this.type !== 'line'){
+    if (this.isDown && this.type !== 'line') {
       this.record(this.endCoor.x, this.endCoor.y, this.type);
-      this.temCanvas.width = this.width;
+      this.clearCanvas(this.temCanvas, this.temCtx);
       this.drawUseData(this.way[this.type][this.drawID], this.type);
       console.log(this.way);
     }
@@ -99,7 +102,7 @@ class Paintbrush {
   }
 
   drawUseData(data, type) {
-    switch(type) {
+    switch (type) {
     case 'straightLine':
       this.drawStraightLineUseData(data);
       break;
@@ -124,7 +127,7 @@ class Paintbrush {
   }
 
   drawStraightLine(x, y) {
-    this.temCanvas.width = this.width;
+    this.clearCanvas(this.temCanvas, this.temCtx);
     this.temCtx.moveTo(this.startCoor.x, this.startCoor.y);
 
     this.drawLine(x, y);
@@ -138,23 +141,23 @@ class Paintbrush {
   }
 
   drawRect(x, y) {
-    this.temCanvas.width = this.width;
+    this.clearCanvas(this.temCanvas, this.temCtx);
     const sx = this.startCoor.x;
     const sy = this.startCoor.y;
     this.temCtx.strokeRect(sx, sy, x - sx, y - sy);
   }
 
   drawRectUseData(data) {
-    const [ start, end ] = data;
+    const [start, end] = data;
     this.notLineCtx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1]);
   }
 
   drawCircle(ex, ey) {
-    this.temCanvas.width = this.width;
+    this.clearCanvas(this.temCanvas, this.temCtx);
     this.circle({
       sx: this.startCoor.x,
       sy: this.startCoor.y,
-      ex, ey, 
+      ex, ey,
       ctx: this.temCtx
     });
   }
@@ -170,7 +173,7 @@ class Paintbrush {
     });
   }
 
-  circle({sx, sy, ex, ey, ctx}) {
+  circle({ sx, sy, ex, ey, ctx }) {
     const cx = (ex + sx) / 2;
     const cy = (ey + sy) / 2;
     const r = Math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2) / 2;
@@ -180,7 +183,7 @@ class Paintbrush {
   }
 
   drawEllipse(ex, ey) {
-    this.temCanvas.width = this.width;
+    this.clearCanvas(this.temCanvas, this.temCtx);
     this.ellipse({
       sx: this.startCoor.x,
       sy: this.startCoor.y,
@@ -200,20 +203,18 @@ class Paintbrush {
     });
   }
 
-  ellipse({sx, sy, ex, ey, ctx}) {
+  ellipse({ sx, sy, ex, ey, ctx }) {
     const cx = (ex + sx) / 2;
     const cy = (ey + sy) / 2;
-    const lx = ex - sx;
-    const ly = ey - sy;
+    const a = Math.abs((ex - sx) / 2);
+    const b = Math.abs((ey - sy) / 2);
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(Math.atan(ly / lx));
-    const a = Math.sqrt(lx ** 2 + ly ** 2) / 2;
-    const r = 1 / 10;
+    const r = 1 / 20;
     ctx.moveTo(a, 0);
-    for (let h = 0;h < 2 * Math.PI; h += r) {
+    for (let h = 0; h < 2 * Math.PI; h += r) {
       const tanH = Math.tan(h);
-      let x = Math.sqrt((a ** 2) / (1 + 4 * (tanH ** 2)));
+      let x = Math.sqrt(((a ** 2) * (b ** 2)) / ((b ** 2) + ((a * tanH) ** 2)));
       if (h > (Math.PI / 2) && h < (Math.PI * 3 / 2)) x = -x;
       const y = tanH * x;
       this.removeRect(ctx);
@@ -232,15 +233,34 @@ class Paintbrush {
     newCanvas.setAttribute('height', this.height);
     newCanvas.setAttribute('style', 'border:solid 1px #000;position:absolute;top:0;left:0;');
     this.canvasDiv.appendChild(newCanvas);
-    return newCanvas;
+    const ctx = newCanvas.getContext('2d');
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'red';
+    return {newCanvas, ctx};
   }
 
   setType(type) {
     this.type = type;
   }
 
+  setMeasurement({ w, h }) {
+    if (!w && !h) return;
+    if (!isNaN(parseInt(w))) {
+      this.width = w;
+    }
+    if (!isNaN(parseInt(h))) {
+      this.height = h;
+    }
+    this.canvas.setAttribute('width', this.width);
+    this.canvas.setAttribute('height', this.height);
+    this.temCanvas.setAttribute('width', this.width);
+    this.temCanvas.setAttribute('height', this.height);
+    this.notLineCanvas.setAttribute('width', this.width);
+    this.notLineCanvas.setAttribute('height', this.height);
+  }
+
   record(x, y, type) {
-    const key= this.way[type];
+    const key = this.way[type];
     if (key[this.drawID] === undefined) key[this.drawID] = [];
     key[this.drawID].push([x, y]);
   }
@@ -251,23 +271,30 @@ class Paintbrush {
     ctx.clearRect(0, 0, this.width, -this.height);
     ctx.clearRect(0, 0, -this.width, -this.height);
   }
+
+  clearCanvas(canvas, ctx) {
+    canvas.width = this.width;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'red';
+  }
 }
 
 window.onload = () => {
   const canvasCtr = new Paintbrush('#canvasDiv');
-  document.querySelector('#line').addEventListener('click',() => {
+
+  document.querySelector('#line').addEventListener('click', () => {
     canvasCtr.setType('line');
   });
-  document.querySelector('#straightLine').addEventListener('click',() => {
+  document.querySelector('#straightLine').addEventListener('click', () => {
     canvasCtr.setType('straightLine');
   });
-  document.querySelector('#rect').addEventListener('click',() => {
+  document.querySelector('#rect').addEventListener('click', () => {
     canvasCtr.setType('rect');
   });
-  document.querySelector('#circle').addEventListener('click',() => {
+  document.querySelector('#circle').addEventListener('click', () => {
     canvasCtr.setType('circle');
   });
-  document.querySelector('#ellipse').addEventListener('click',() => {
+  document.querySelector('#ellipse').addEventListener('click', () => {
     canvasCtr.setType('ellipse');
   });
 };
