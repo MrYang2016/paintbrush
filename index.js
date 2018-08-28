@@ -1,9 +1,12 @@
 class Paintbrush {
-  constructor(canvasDiv, { type = 'line', width, height } = {}) {
+  constructor(canvasDiv, { type = 'line', width, height, lineWidth = 3, strokeStyle = 'red', canEdit = false } = {}) {
     this.width = width || 500;
     this.height = height || 500;
     this.canvasDiv = typeof canvasDiv === 'string' ? document.querySelector(canvasDiv) : canvasDiv;
     this.canvasDiv.setAttribute('style', 'position:relative;');
+
+    this.lineWidth = lineWidth;
+    this.strokeStyle = strokeStyle;
 
     const canvasObj = this.getNewCanvas();
     this.canvas = canvasObj.newCanvas;
@@ -27,7 +30,7 @@ class Paintbrush {
       x: this.canvasDiv.offsetLeft,
       y: this.canvasDiv.offsetTop
     };
-    this.listen();
+    if (canEdit) this.listen();
   }
 
   listen() {
@@ -101,8 +104,17 @@ class Paintbrush {
     }
   }
 
+  drawFromSocket(data) {
+    let lineData = data instanceof Array ? data : [data];
+    lineData.forEach(obj => {
+      const {type, points} = obj;
+      this.drawUseData(points, type);
+    });
+  }
+
   drawUseData(data, type) {
     switch (type) {
+    case 'line':
     case 'straightLine':
       this.drawStraightLineUseData(data);
       break;
@@ -112,6 +124,7 @@ class Paintbrush {
     case 'circle':
       this.drawCircleUseData(data);
       break;
+    case 'circ':  
     case 'ellipse':
       this.drawEllipseUseData(data);
       break;
@@ -134,9 +147,10 @@ class Paintbrush {
   }
 
   drawStraightLineUseData(data) {
+    const [start, end] = data;
     this.ctx.clearRect(0, 0, this.width, this.height);
-    this.ctx.moveTo(...data[0]);
-    this.ctx.lineTo(...data[1]);
+    this.ctx.moveTo(start.x, start.y);
+    this.ctx.lineTo(end.x, end.y);
     this.ctx.stroke();
   }
 
@@ -148,8 +162,13 @@ class Paintbrush {
   }
 
   drawRectUseData(data) {
-    const [start, end] = data;
-    this.notLineCtx.strokeRect(start[0], start[1], end[0] - start[0], end[1] - start[1]);
+    const [s, e] = data;
+    this.notLineCtx.strokeRect(
+      s.x, 
+      s.y, 
+      e.x - s.x, 
+      e.y - s.y
+    );
   }
 
   drawCircle(ex, ey) {
@@ -165,10 +184,10 @@ class Paintbrush {
   drawCircleUseData(data) {
     const [s, e] = data;
     this.circle({
-      sx: s[0],
-      sy: s[1],
-      ex: e[0],
-      ey: e[1],
+      sx: s.x,
+      sy: s.y,
+      ex: e.x,
+      ey: e.y,
       ctx: this.notLineCtx
     });
   }
@@ -195,10 +214,10 @@ class Paintbrush {
   drawEllipseUseData(data) {
     const [s, e] = data;
     this.ellipse({
-      sx: s[0],
-      sy: s[1],
-      ex: e[0],
-      ey: e[1],
+      sx: s.x,
+      sy: s.y,
+      ex: e.x,
+      ey: e.y,
       ctx: this.ctx
     });
   }
@@ -234,8 +253,8 @@ class Paintbrush {
     newCanvas.setAttribute('style', 'border:solid 1px #000;position:absolute;top:0;left:0;');
     this.canvasDiv.appendChild(newCanvas);
     const ctx = newCanvas.getContext('2d');
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'red';
+    ctx.lineWidth = this.lineWidth;
+    ctx.strokeStyle = this.strokeStyle;
     return {newCanvas, ctx};
   }
 
@@ -262,7 +281,7 @@ class Paintbrush {
   record(x, y, type) {
     const key = this.way[type];
     if (key[this.drawID] === undefined) key[this.drawID] = [];
-    key[this.drawID].push([x, y]);
+    key[this.drawID].push({x, y});
   }
 
   removeRect(ctx) {
@@ -274,13 +293,40 @@ class Paintbrush {
 
   clearCanvas(canvas, ctx) {
     canvas.width = this.width;
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'red';
+    ctx.lineWidth = this.lineWidth;
+    ctx.strokeStyle = this.strokeStyle;
   }
 }
 
 window.onload = () => {
-  const canvasCtr = new Paintbrush('#canvasDiv');
+  const testData = {
+    ID: 0,//画笔层级
+    autoId: 2557,
+    clientHeight: 540,//客户端画板高
+    clientWidth: 720,//客户端画板宽
+    color: '#FF0000',//颜色
+    content: '1',
+    font: '#dfdfxd',
+    'pageId': 0,//页数
+    'points': [
+      {
+        x: 160,
+        y: 425
+      },
+      {
+        x: 278,
+        y: 230
+      }
+    ],
+    'pointscount': 1,
+    'size': 20,//大小/粗细
+    'timeStamp': 136333,//时间戳，回看用，从onSliceStart推流时开始算
+    'type': 'circ'//画笔类型line（直线/画笔）/circ（圆）/rect（矩形）/text（文本）
+  };
+  const canvasCtr = new Paintbrush('#canvasDiv',{
+    canEdit: true
+  });
+  canvasCtr.drawFromSocket(testData);
 
   document.querySelector('#line').addEventListener('click', () => {
     canvasCtr.setType('line');
