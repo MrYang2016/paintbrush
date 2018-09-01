@@ -67,7 +67,10 @@ class Paintbrush {
   }
 
   start(x, y) {
-    if (this.type === 'line' || this.type === 'straightLine') this.ctx.moveTo(x, y);
+    if (this.type === 'line') this.ctx.beginPath();
+    if (this.type === 'line' || this.type === 'straightLine') {
+      this.ctx.moveTo(x, y);
+    }
     this.isDown = true;
     this.drawID = `${this.type}_${(new Date()).getTime()}`;
     this.record(x, y, this.type);
@@ -78,7 +81,6 @@ class Paintbrush {
       this.record(this.endCoor.x, this.endCoor.y, this.type);
       this.clearCanvas(this.temCanvas, this.temCtx);
       this.drawUseData(this.way[this.type][this.drawID], this.type);
-      console.log(this.way);
     }
     this.isDown = false;
   }
@@ -105,9 +107,11 @@ class Paintbrush {
   }
 
   drawFromSocket(data) {
+    if (!data) return;
     let lineData = data instanceof Array ? data : [data];
     lineData.forEach(obj => {
-      const {type, points} = obj;
+      const {type, points, color, size} = obj;
+      this.setStyle({lineWidth: size, strokeStyle: color});
       this.drawUseData(points, type);
     });
   }
@@ -133,9 +137,10 @@ class Paintbrush {
 
   drawLine(x, y) {
     const ctx = this.type === 'line' ? this.ctx : this.temCtx;
-    ctx.clearRect(0, 0, this.width, this.height);
     ctx.lineTo(x, y);
     ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x, y);
     if (this.type === 'line') this.record(x, y, 'line');
   }
 
@@ -148,7 +153,7 @@ class Paintbrush {
 
   drawStraightLineUseData(data) {
     const [start, end] = data;
-    this.ctx.clearRect(0, 0, this.width, this.height);
+    this.ctx.beginPath();
     this.ctx.moveTo(start.x, start.y);
     this.ctx.lineTo(end.x, end.y);
     this.ctx.stroke();
@@ -230,17 +235,18 @@ class Paintbrush {
     ctx.save();
     ctx.translate(cx, cy);
     const r = 1 / 20;
+    ctx.beginPath();
     ctx.moveTo(a, 0);
     for (let h = 0; h < 2 * Math.PI; h += r) {
       const tanH = Math.tan(h);
       let x = Math.sqrt(((a ** 2) * (b ** 2)) / ((b ** 2) + ((a * tanH) ** 2)));
       if (h > (Math.PI / 2) && h < (Math.PI * 3 / 2)) x = -x;
       const y = tanH * x;
-      this.removeRect(ctx);
       ctx.lineTo(x, y);
       ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
     }
-    this.removeRect(ctx);
     ctx.lineTo(a, 0);
     ctx.stroke();
     ctx.restore();
@@ -278,17 +284,26 @@ class Paintbrush {
     this.notLineCanvas.setAttribute('height', this.height);
   }
 
+  setStyle({lineWidth, strokeStyle}) {
+    if (lineWidth) {
+      this.lineWidth = lineWidth;
+      this.ctx.lineWidth = lineWidth;
+      this.temCtx.lineWidth = lineWidth;
+      this.notLineCtx.lineWidth = lineWidth;
+    }
+    if (strokeStyle) {
+      this.strokeStyle = strokeStyle;
+      this.ctx.strokeStyle = strokeStyle;
+      this.temCtx.strokeStyle = strokeStyle;
+      this.notLineCtx.strokeStyle = strokeStyle;
+    }
+    
+  }
+
   record(x, y, type) {
     const key = this.way[type];
     if (key[this.drawID] === undefined) key[this.drawID] = [];
     key[this.drawID].push({x, y});
-  }
-
-  removeRect(ctx) {
-    ctx.clearRect(0, 0, this.width, this.height);
-    ctx.clearRect(0, 0, -this.width, this.height);
-    ctx.clearRect(0, 0, this.width, -this.height);
-    ctx.clearRect(0, 0, -this.width, -this.height);
   }
 
   clearCanvas(canvas, ctx) {
@@ -304,7 +319,7 @@ window.onload = () => {
     autoId: 2557,
     clientHeight: 540,//客户端画板高
     clientWidth: 720,//客户端画板宽
-    color: '#FF0000',//颜色
+    color: 'yellow',//颜色
     content: '1',
     font: '#dfdfxd',
     'pageId': 0,//页数
@@ -319,14 +334,38 @@ window.onload = () => {
       }
     ],
     'pointscount': 1,
-    'size': 20,//大小/粗细
+    'size': 5,//大小/粗细
     'timeStamp': 136333,//时间戳，回看用，从onSliceStart推流时开始算
     'type': 'circ'//画笔类型line（直线/画笔）/circ（圆）/rect（矩形）/text（文本）
+  };
+  const testData2 = {
+    ID: 0,//画笔层级
+    autoId: 2557,
+    clientHeight: 540,//客户端画板高
+    clientWidth: 720,//客户端画板宽
+    color: 'blue',//颜色
+    content: '1',
+    font: '#dfdfxd',
+    'pageId': 0,//页数
+    'points': [
+      {
+        x: 200,
+        y: 625
+      },
+      {
+        x: 178,
+        y: 130
+      }
+    ],
+    'pointscount': 1,
+    'size': 2,//大小/粗细
+    'timeStamp': 136333,//时间戳，回看用，从onSliceStart推流时开始算
+    'type': 'rect'//画笔类型line（直线/画笔）/circ（圆）/rect（矩形）/text（文本）
   };
   const canvasCtr = new Paintbrush('#canvasDiv',{
     canEdit: true
   });
-  canvasCtr.drawFromSocket(testData);
+  canvasCtr.drawFromSocket([testData, testData2]);
 
   document.querySelector('#line').addEventListener('click', () => {
     canvasCtr.setType('line');
@@ -342,6 +381,18 @@ window.onload = () => {
   });
   document.querySelector('#ellipse').addEventListener('click', () => {
     canvasCtr.setType('ellipse');
+  });
+  document.querySelector('#red').addEventListener('click', () => {
+    canvasCtr.setStyle({strokeStyle:'red'});
+  });
+  document.querySelector('#green').addEventListener('click', () => {
+    canvasCtr.setStyle({strokeStyle:'green'});
+  });
+  document.querySelector('#other').addEventListener('click', () => {
+    canvasCtr.setStyle({strokeStyle:'#abcdef'});
+  });
+  document.querySelector('#lineWidth').addEventListener('click', () => {
+    canvasCtr.setStyle({lineWidth:'5'});
   });
 };
 
