@@ -311,6 +311,12 @@ class Paintbrush {
     ctx.lineWidth = this.lineWidth;
     ctx.strokeStyle = this.strokeStyle;
   }
+
+  clear() {
+    this.clearCanvas(this.canvas, this.ctx);
+    this.clearCanvas(this.temCanvas, this.temCtx);
+    this.clearCanvas(this.notLineCanvas, this.notLineCtx);
+  }
 }
 
 window.onload = () => {
@@ -393,6 +399,9 @@ window.onload = () => {
   });
   document.querySelector('#lineWidth').addEventListener('click', () => {
     canvasCtr.setStyle({lineWidth:'5'});
+  });
+  document.querySelector('#clear').addEventListener('click', () => {
+    canvasCtr.clear();
   });
 };
 
