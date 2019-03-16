@@ -53,20 +53,20 @@ class Paintbrush {
       const x = e.clientX + scrollX - this.origin.x;
       const y = e.clientY + scrollY - this.origin.y;
       switch (type) {
-        case 'mousedown':
-          this.startCoor.x = x;
-          this.startCoor.y = y;
-          this.start(x, y);
-          break;
-        case 'mousemove':
-          this.draw(x, y);
-          this.endCoor.x = x;
-          this.endCoor.y = y;
-          break;
-        case 'mouseup':
-        case 'mouseout':
-          this.done();
-          break;
+      case 'mousedown':
+        this.startCoor.x = x;
+        this.startCoor.y = y;
+        this.start(x, y);
+        break;
+      case 'mousemove':
+        this.draw(x, y);
+        this.endCoor.x = x;
+        this.endCoor.y = y;
+        break;
+      case 'mouseup':
+      case 'mouseout':
+        this.done();
+        break;
       }
     };
   }
@@ -95,32 +95,32 @@ class Paintbrush {
   draw(x, y) {
     if (!this.isDown) return;
     switch (this.type) {
-      case 'freeline':
-      case 'line':
-        this.drawLine(x, y);
-        break;
-      case 'arrowLine':
-        this.drawArrow({
-          sx: this.startCoor.x,
-          sy: this.startCoor.y,
-          ex: x,
-          ey: y,
-          ctx: this.temCtx,
-          canvas: this.temCanvas
-        });
-        break;
-      case 'straightLine':
-        this.drawStraightLine(x, y);
-        break;
-      case 'rect':
-        this.drawRect(x, y);
-        break;
-      case 'circle':
-        this.drawCircle(x, y);
-        break;
-      case 'ellipse':
-        this.drawEllipse(x, y);
-        break;
+    case 'freeline':
+    case 'line':
+      this.drawLine(x, y);
+      break;
+    case 'arrowLine':
+      this.drawArrow({
+        sx: this.startCoor.x,
+        sy: this.startCoor.y,
+        ex: x,
+        ey: y,
+        ctx: this.temCtx,
+        canvas: this.temCanvas
+      });
+      break;
+    case 'straightLine':
+      this.drawStraightLine(x, y);
+      break;
+    case 'rect':
+      this.drawRect(x, y);
+      break;
+    case 'circle':
+      this.drawCircle(x, y);
+      break;
+    case 'ellipse':
+      this.drawEllipse(x, y);
+      break;
     }
   }
 
@@ -150,29 +150,29 @@ class Paintbrush {
 
   drawUseData(data, type) {
     switch (type) {
-      case 'freeline':
-      case 'line':
-        this.drawLineUseData(data);
-        break;
-      case 'arrowLine':
-        this.drawArrowUseData(data);
-        break;
-      case 'straightLine':
-        this.drawStraightLineUseData(data);
-        break;
-      case 'rect':
-        this.drawRectUseData(data);
-        break;
-      case 'circle':
-        this.drawCircleUseData(data);
-        break;
-      case 'circ':
-      case 'ellipse':
-        this.drawEllipseUseData(data);
-        break;
-      case 'text':
-        this.drawTextUseData(data);
-        break;
+    case 'freeline':
+    case 'line':
+      this.drawLineUseData(data);
+      break;
+    case 'arrowLine':
+      this.drawArrowUseData(data);
+      break;
+    case 'straightLine':
+      this.drawStraightLineUseData(data);
+      break;
+    case 'rect':
+      this.drawRectUseData(data);
+      break;
+    case 'circle':
+      this.drawCircleUseData(data);
+      break;
+    case 'circ':
+    case 'ellipse':
+      this.drawEllipseUseData(data);
+      break;
+    case 'text':
+      this.drawTextUseData(data);
+      break;
     }
   }
 
