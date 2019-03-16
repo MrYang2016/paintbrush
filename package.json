@@ -7,5 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "yang",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "koa": "^2.6.1",
+    "ppt-paint-for-animation": "^1.0.2"
+  }
 }

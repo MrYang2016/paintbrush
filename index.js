@@ -1,9 +1,10 @@
+
 class Paintbrush {
   constructor(canvasDiv, { type = 'line', width, height, lineWidth = 3, strokeStyle = 'red', canEdit = false } = {}) {
     this.width = width || 500;
     this.height = height || 500;
     this.canvasDiv = typeof canvasDiv === 'string' ? document.querySelector(canvasDiv) : canvasDiv;
-    this.canvasDiv.setAttribute('style', 'position:relative;');
+    this.canvasDiv.setAttribute('style', 'position:absolute;width:100%;height:100%;left:0;top:0;');
 
     this.lineWidth = lineWidth;
     this.strokeStyle = strokeStyle;
@@ -23,13 +24,17 @@ class Paintbrush {
     this.isDown = false;
     this.endCoor = {};
     this.startCoor = {};
-    this.way = { line: {}, straightLine: {}, rect: {}, circle: {}, ellipse: {} };
+    this.way = { line: {}, straightLine: {}, rect: {}, circle: {}, ellipse: {}, arrowLine: {} };
+    this.historyData = {};
     this.drawID = '';
     this.type = type;
     this.origin = {
-      x: this.canvasDiv.offsetLeft,
-      y: this.canvasDiv.offsetTop
+      x: this.canvasDiv.parentNode.offsetLeft,
+      y: this.canvasDiv.parentNode.offsetTop
     };
+    this.lastDrawData = null;
+    this.autoId = '';
+    this.resizeFn = [];
     if (canEdit) this.listen();
   }
 
@@ -48,39 +53,41 @@ class Paintbrush {
       const x = e.clientX + scrollX - this.origin.x;
       const y = e.clientY + scrollY - this.origin.y;
       switch (type) {
-      case 'mousedown':
-        this.startCoor.x = x;
-        this.startCoor.y = y;
-        this.start(x, y);
-        break;
-      case 'mousemove':
-        this.draw(x, y);
-        this.endCoor.x = x;
-        this.endCoor.y = y;
-        break;
-      case 'mouseup':
-      case 'mouseout':
-        this.done();
-        break;
+        case 'mousedown':
+          this.startCoor.x = x;
+          this.startCoor.y = y;
+          this.start(x, y);
+          break;
+        case 'mousemove':
+          this.draw(x, y);
+          this.endCoor.x = x;
+          this.endCoor.y = y;
+          break;
+        case 'mouseup':
+        case 'mouseout':
+          this.done();
+          break;
       }
     };
   }
 
   start(x, y) {
-    if (this.type === 'line') this.ctx.beginPath();
-    if (this.type === 'line' || this.type === 'straightLine') {
+    const type = this.type;
+    if (type === 'line' || type === 'freeline') this.ctx.beginPath();
+    if (type === 'line' || type === 'freeline' || type === 'straightLine') {
       this.ctx.moveTo(x, y);
     }
     this.isDown = true;
     this.drawID = `${this.type}_${(new Date()).getTime()}`;
-    this.record(x, y, this.type);
+    this.record({ x, y, type: this.type, id: this.drawID });
   }
 
   done() {
-    if (this.isDown && this.type !== 'line') {
-      this.record(this.endCoor.x, this.endCoor.y, this.type);
+    const type = this.type;
+    if (this.isDown && !(type === 'line' || type === 'freeline')) {
+      this.record({ x: this.endCoor.x, y: this.endCoor.y, type, id: this.drawID });
       this.clearCanvas(this.temCanvas, this.temCtx);
-      this.drawUseData(this.way[this.type][this.drawID], this.type);
+      this.drawUseData(this.way[type][this.drawID], type);
     }
     this.isDown = false;
   }
@@ -88,60 +95,146 @@ class Paintbrush {
   draw(x, y) {
     if (!this.isDown) return;
     switch (this.type) {
-    case 'line':
-      this.drawLine(x, y);
-      break;
-    case 'straightLine':
-      this.drawStraightLine(x, y);
-      break;
-    case 'rect':
-      this.drawRect(x, y);
-      break;
-    case 'circle':
-      this.drawCircle(x, y);
-      break;
-    case 'ellipse':
-      this.drawEllipse(x, y);
-      break;
+      case 'freeline':
+      case 'line':
+        this.drawLine(x, y);
+        break;
+      case 'arrowLine':
+        this.drawArrow({
+          sx: this.startCoor.x,
+          sy: this.startCoor.y,
+          ex: x,
+          ey: y,
+          ctx: this.temCtx,
+          canvas: this.temCanvas
+        });
+        break;
+      case 'straightLine':
+        this.drawStraightLine(x, y);
+        break;
+      case 'rect':
+        this.drawRect(x, y);
+        break;
+      case 'circle':
+        this.drawCircle(x, y);
+        break;
+      case 'ellipse':
+        this.drawEllipse(x, y);
+        break;
     }
   }
 
-  drawFromSocket(data) {
+  drawFromSocket(data, pageType = 'page', isRedraw = true) {
     if (!data) return;
     let lineData = data instanceof Array ? data : [data];
     lineData.forEach(obj => {
-      const {type, points, color, size} = obj;
-      this.setStyle({lineWidth: size, strokeStyle: color});
-      this.drawUseData(points, type);
+      const { type, points, color, size, ID, pageId, clientWidth, clientHeight, autoId } = obj;
+      this.resizeFn.forEach(v => v(clientWidth / clientHeight, autoId));
+      const pushObj = JSON.parse(JSON.stringify(obj));
+      const prop = this.width / clientWidth;
+      pushObj.size = size * prop;
+      pushObj.points = points.map(v => ({
+        x: v.x * prop,
+        y: v.y * prop
+      }));
+      this.setStyle({ lineWidth: pushObj.size, strokeStyle: color });
+      this.drawUseData(type === 'text' ? pushObj : pushObj.points, type);
+      if (isRedraw) {
+        const key = `${pageType}${pageType === 'whiteBoard' ? '' : this.autoId}${pageId}`;
+        if (this.historyData[key] === undefined) this.historyData[key] = [];
+        this.historyData[key][parseInt(ID)] = obj;
+      }
     });
+    this.lastDrawData = lineData[lineData.length - 1];
   }
 
   drawUseData(data, type) {
     switch (type) {
-    case 'line':
-    case 'straightLine':
-      this.drawStraightLineUseData(data);
-      break;
-    case 'rect':
-      this.drawRectUseData(data);
-      break;
-    case 'circle':
-      this.drawCircleUseData(data);
-      break;
-    case 'circ':  
-    case 'ellipse':
-      this.drawEllipseUseData(data);
-      break;
+      case 'freeline':
+      case 'line':
+        this.drawLineUseData(data);
+        break;
+      case 'arrowLine':
+        this.drawArrowUseData(data);
+        break;
+      case 'straightLine':
+        this.drawStraightLineUseData(data);
+        break;
+      case 'rect':
+        this.drawRectUseData(data);
+        break;
+      case 'circle':
+        this.drawCircleUseData(data);
+        break;
+      case 'circ':
+      case 'ellipse':
+        this.drawEllipseUseData(data);
+        break;
+      case 'text':
+        this.drawTextUseData(data);
+        break;
     }
   }
 
   drawLine(x, y) {
-    const ctx = this.type === 'line' ? this.ctx : this.temCtx;
+    const type = this.type;
+    const ctx = type === 'line' || type === 'freeline' ? this.ctx : this.temCtx;
     ctx.lineTo(x, y);
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(x, y);
-    if (this.type === 'line') this.record(x, y, 'line');
+    if (type === 'line' || type === 'freeline') this.record({ x, y, type, id: this.drawID });
+  }
+
+  drawLineUseData(data) {
+    this.ctx.beginPath();
+    this.ctx.moveTo(data[0].x, data[0].y);
+    for (let i = 1, len = data.length; i < len; i++) {
+      const { x, y } = data[i];
+      this.ctx.lineTo(x, y);
+      this.ctx.stroke();
+      this.ctx.beginPath();
+      this.ctx.moveTo(x, y);
+    }
+  }
+
+  drawArrow({ sx, sy, ex, ey, ctx, canvas, arrowAngle = 45, arrowLen = 30 }) {
+    if (canvas) this.clearCanvas(canvas, ctx);
+    const aa = arrowAngle * Math.PI / 180;
+    const arrowX = Math.cos(aa / 2) * arrowLen;
+    const arrowY = Math.sin(aa / 2) * arrowLen;
+    ctx.beginPath();
+    ctx.fillStyle = this.strokeStyle;
+    ctx.moveTo(sx, sy);
+    ctx.save();
+    ctx.translate(ex, ey);
+    const tanAngle = Math.atan((ey - sy) / (ex - sx));
+    let angle = tanAngle;
+    if (tanAngle > 0) {
+      if (ey - sy < 0) angle = tanAngle - Math.PI;
+    } else {
+      if (ey - sy > 0) angle = tanAngle + Math.PI;
+    }
+    ctx.rotate(angle);
+    ctx.lineTo(-arrowX, -arrowY / 2);
+    ctx.lineTo(-arrowX, -arrowY);
+    ctx.lineTo(0, 0);
+    ctx.lineTo(-arrowX, arrowY);
+    ctx.lineTo(-arrowX, arrowY / 2);
+    ctx.fill();
+    ctx.closePath();
+    ctx.restore();
+  }
+
+  drawArrowUseData(data) {
+    const [s, e] = data;
+    this.drawArrow({
+      sx: s.x,
+      sy: s.y,
+      ex: e.x,
+      ey: e.y,
+      ctx: this.notLineCtx,
+    });
   }
 
   drawStraightLine(x, y) {
@@ -169,9 +262,9 @@ class Paintbrush {
   drawRectUseData(data) {
     const [s, e] = data;
     this.notLineCtx.strokeRect(
-      s.x, 
-      s.y, 
-      e.x - s.x, 
+      s.x,
+      s.y,
+      e.x - s.x,
       e.y - s.y
     );
   }
@@ -252,23 +345,33 @@ class Paintbrush {
     ctx.restore();
   }
 
+  drawTextUseData(data) {
+    const { content, size, points, color } = data;
+    this.ctx.fillStyle = color;
+    this.ctx.font = `${size}px arial`;
+    this.ctx.fillText(content, points[0].x, points[0].y);
+  }
+
   getNewCanvas() {
     const newCanvas = document.createElement('canvas');
     newCanvas.setAttribute('width', this.width);
     newCanvas.setAttribute('height', this.height);
-    newCanvas.setAttribute('style', 'border:solid 1px #000;position:absolute;top:0;left:0;');
+    newCanvas.setAttribute('style', 'position:absolute;top:0;left:0;transform: none;');
     this.canvasDiv.appendChild(newCanvas);
     const ctx = newCanvas.getContext('2d');
     ctx.lineWidth = this.lineWidth;
     ctx.strokeStyle = this.strokeStyle;
-    return {newCanvas, ctx};
+    newCanvas.oncontextmenu = function (e) {
+      e.preventDefault();
+    };
+    return { newCanvas, ctx };
   }
 
   setType(type) {
     this.type = type;
   }
 
-  setMeasurement({ w, h }) {
+  setMeasurement({ w, h, pageId, pageType, isRedraw = true }) {
     if (!w && !h) return;
     if (!isNaN(parseInt(w))) {
       this.width = w;
@@ -282,9 +385,14 @@ class Paintbrush {
     this.temCanvas.setAttribute('height', this.height);
     this.notLineCanvas.setAttribute('width', this.width);
     this.notLineCanvas.setAttribute('height', this.height);
+    let canvasDivStyle = `position:absolute;width:${this.width}px;height:${this.height}px;top:50%;left:50%;margin-top:-${this.height / 2}px;margin-left:-${this.width / 2}px;`;
+    if (pageType === 'whiteBoard') canvasDivStyle += 'background:#fff;';
+    this.canvasDiv.setAttribute('style', canvasDivStyle);
+
+    if (isRedraw) this.redraw(pageId || 0, pageType);
   }
 
-  setStyle({lineWidth, strokeStyle}) {
+  setStyle({ lineWidth, strokeStyle }) {
     if (lineWidth) {
       this.lineWidth = lineWidth;
       this.ctx.lineWidth = lineWidth;
@@ -297,13 +405,12 @@ class Paintbrush {
       this.temCtx.strokeStyle = strokeStyle;
       this.notLineCtx.strokeStyle = strokeStyle;
     }
-    
   }
 
-  record(x, y, type) {
+  record({ x, y, type, id }) {
     const key = this.way[type];
-    if (key[this.drawID] === undefined) key[this.drawID] = [];
-    key[this.drawID].push({x, y});
+    if (key[id] === undefined) key[id] = [];
+    key[id].push({ x, y });
   }
 
   clearCanvas(canvas, ctx) {
@@ -317,67 +424,96 @@ class Paintbrush {
     this.clearCanvas(this.temCanvas, this.temCtx);
     this.clearCanvas(this.notLineCanvas, this.notLineCtx);
   }
+
+  delete({ pageId, ID, pageType = 'page' }) {
+    const key = `${pageType}${pageType === 'whiteBoard' ? '' : this.autoId}${pageId}`;
+    if (!this.historyData[key]) return;
+    const newArr = this.historyData[key].reduce((a, v, i) => {
+      if (parseInt(i) !== parseInt(ID)) {
+        a.push(v);
+      }
+      return a;
+    }, []);
+    this.clear();
+    newArr.forEach(v => {
+      this.drawFromSocket(v, pageType);
+    });
+    this.historyData[key] = newArr;
+  }
+
+  redraw(pageId, pageType = 'page', time) {
+    this.clear();
+    const key = `${pageType}${pageType === 'whiteBoard' ? '' : this.autoId}${pageId}`;
+    const hisArr = this.historyData[key];
+    if (!hisArr) return;
+    hisArr.forEach(v => {
+      if (time === undefined || (time !== undefined && v.timeStamp !== undefined && time >= v.timeStamp)) {
+        this.drawFromSocket(v, pageType, false);
+      }
+    });
+    return true;
+  }
+
+  clearHistory(autoId, pageId, ID) {
+    // log(`clearHistory,autoId:${autoId},pageId:${pageId},ID:${ID}`);
+    if (autoId !== undefined) {
+      if (pageId !== undefined) {
+        const key = this._getKey(autoId, pageId);
+        let hisArr = this.historyData[key];
+        if (!hisArr) return this;
+        ID !== undefined
+          ? hisArr.splice(parseInt(ID), 1)
+          : (this.historyData[key] = []);
+      } else {
+        for (let key in this.historyData) {
+          if (key.indexOf('page') !== -1) {
+            this.historyData[key] = [];
+          }
+        }
+      }
+    } else {
+      this.historyData = {};
+      this.clear();
+    }
+    return this;
+  }
+
+  saveHistory(obj) {
+    const { ID, pageId, autoId } = obj;
+    const key = this._getKey(autoId, pageId);
+    if (this.historyData[key] === undefined) this.historyData[key] = [];
+    this.historyData[key][parseInt(ID)] = obj;
+  }
+
+  _getKey(autoId, pageId) {
+    const isWhite = parseInt(autoId) === 0;
+    return `${isWhite ? 'whiteBoard' : 'page'}${isWhite ? '' : autoId}${pageId}`;
+  }
+
+  subResize(fn) {
+    if (fn instanceof Function) {
+      this.resizeFn.push(fn);
+    }
+  }
 }
 
+// export default Paintbrush;
+
 window.onload = () => {
-  const testData = {
-    ID: 0,//画笔层级
-    autoId: 2557,
-    clientHeight: 540,//客户端画板高
-    clientWidth: 720,//客户端画板宽
-    color: 'yellow',//颜色
-    content: '1',
-    font: '#dfdfxd',
-    'pageId': 0,//页数
-    'points': [
-      {
-        x: 160,
-        y: 425
-      },
-      {
-        x: 278,
-        y: 230
-      }
-    ],
-    'pointscount': 1,
-    'size': 5,//大小/粗细
-    'timeStamp': 136333,//时间戳，回看用，从onSliceStart推流时开始算
-    'type': 'circ'//画笔类型line（直线/画笔）/circ（圆）/rect（矩形）/text（文本）
-  };
-  const testData2 = {
-    ID: 0,//画笔层级
-    autoId: 2557,
-    clientHeight: 540,//客户端画板高
-    clientWidth: 720,//客户端画板宽
-    color: 'blue',//颜色
-    content: '1',
-    font: '#dfdfxd',
-    'pageId': 0,//页数
-    'points': [
-      {
-        x: 200,
-        y: 625
-      },
-      {
-        x: 178,
-        y: 130
-      }
-    ],
-    'pointscount': 1,
-    'size': 2,//大小/粗细
-    'timeStamp': 136333,//时间戳，回看用，从onSliceStart推流时开始算
-    'type': 'rect'//画笔类型line（直线/画笔）/circ（圆）/rect（矩形）/text（文本）
-  };
-  const canvasCtr = new Paintbrush('#canvasDiv',{
-    canEdit: true
+  const canvasCtr = new Paintbrush('#canvasDiv', {
+    canEdit: true,
+    width: 800,
+    height: 600
   });
-  canvasCtr.drawFromSocket([testData, testData2]);
 
   document.querySelector('#line').addEventListener('click', () => {
     canvasCtr.setType('line');
   });
   document.querySelector('#straightLine').addEventListener('click', () => {
     canvasCtr.setType('straightLine');
+  });
+  document.querySelector('#arrowLine').addEventListener('click', () => {
+    canvasCtr.setType('arrowLine');
   });
   document.querySelector('#rect').addEventListener('click', () => {
     canvasCtr.setType('rect');
@@ -389,19 +525,22 @@ window.onload = () => {
     canvasCtr.setType('ellipse');
   });
   document.querySelector('#red').addEventListener('click', () => {
-    canvasCtr.setStyle({strokeStyle:'red'});
+    canvasCtr.setStyle({ strokeStyle: 'red' });
   });
   document.querySelector('#green').addEventListener('click', () => {
-    canvasCtr.setStyle({strokeStyle:'green'});
+    canvasCtr.setStyle({ strokeStyle: 'green' });
   });
   document.querySelector('#other').addEventListener('click', () => {
-    canvasCtr.setStyle({strokeStyle:'#abcdef'});
+    canvasCtr.setStyle({ strokeStyle: '#abcdef' });
   });
   document.querySelector('#lineWidth').addEventListener('click', () => {
-    canvasCtr.setStyle({lineWidth:'5'});
+    canvasCtr.setStyle({ lineWidth: '5' });
   });
   document.querySelector('#clear').addEventListener('click', () => {
     canvasCtr.clear();
+  });
+  document.querySelector('#delete').addEventListener('click', () => {
+    canvasCtr.deleteForEdit();
   });
 };
 
