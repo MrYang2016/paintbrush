@@ -1,5 +1,6 @@
 ## canvas实现的画板
 > 最近一直负责公司云课堂的ppt部分，里面包括画板。这部分的功能我觉得值得分享出来。
+> [github地址](https://github.com/MrYang2016/paintbrush)
 
 #### 引入
 直接引用lib目录下的index.js，引入Paintbrush类。
