@@ -1,0 +1,38 @@
+body {
+  margin: 20px;
+  padding: 0;
+}
+
+.out{
+  position: relative;
+  width: 900px;
+  height: 900px;
+}
+#canvasDiv {
+  width: 800px;
+  height: 600px;
+}
+
+#canvasDiv canvas {
+  border: solid 1px #aaa;
+}
+
+.btns{
+  position: absolute;
+  top: 650px;
+  $btnH: 50px;
+  width: 50%;
+  button{
+    width: 100px;
+    height: $btnH;
+    line-height: $btnH;
+    text-align: center;
+    border-radius: 5px;
+    margin: 10px;
+    cursor: pointer;
+    &.active{
+      background-color: blue;
+      color: #fff;
+    }
+  }
+}

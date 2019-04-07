@@ -1,15 +1,41 @@
 {
   "name": "paintbrush",
   "version": "1.0.0",
-  "description": "paintbrush test",
+  "description": "",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+  "directories": {
+    "lib": "lib"
   },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "webpack-dev-server --open --config ./build/webpack.dev.js",
+    "build": "webpack --config ./build/webpack.prod.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MrYang2016/paintbrush.git"
+  },
+  "keywords": [
+    "画板"
+  ],
   "author": "yang",
   "license": "ISC",
-  "dependencies": {
-    "koa": "^2.6.1",
-    "ppt-paint-for-animation": "^1.0.2"
+  "bugs": {
+    "url": "https://github.com/MrYang2016/paintbrush/issues"
+  },
+  "homepage": "https://github.com/MrYang2016/paintbrush#readme",
+  "devDependencies": {
+    "@babel/core": "^7.4.3",
+    "babel-loader": "^8.0.5",
+    "clean-webpack-plugin": "^2.0.1",
+    "css-loader": "^2.1.1",
+    "html-webpack-plugin": "^3.2.0",
+    "node-sass": "^4.11.0",
+    "sass-loader": "^7.1.0",
+    "style-loader": "^0.23.1",
+    "webpack": "^4.29.6",
+    "webpack-cli": "^3.3.0",
+    "webpack-dev-server": "^3.2.1",
+    "webpack-merge": "^4.2.1"
   }
 }
