@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>画板demo</title>
+</head>
+
+<body>
+  <div class="out">
+    <div id="canvasDiv"></div>
+  </div>
+  <div class="btns">
+    <h2>绘制图形</h2>
+    画笔：<button class="active" id="line">line</button>
+    直线：<button id="straightLine">straightLine</button>
+    箭头：<button id="arrowLine">arrowLine</button>
+    方形：<button id="rect">rect</button>
+    圆：<button id="circle">circle</button>
+    椭圆：<button id="ellipse">ellipse</button>
+    <h2>修改颜色</h2>
+    <button id="red">red</button>
+    <button id="green">green</button>
+    <button id="other">other</button>
+    <h2>操作</h2>
+    改变线条宽度：<button id="lineWidth">lineWidth</button>
+    清除所有画笔：<button id="clear">clear</button>
+    清除指定画笔：<button id="delete">delete</button>
+    <h2>数据</h2>
+    <div id="data"></div>
+  </div>
+<script type="text/javascript" src="app.bundle.js"></script></body>
+
+</html>
